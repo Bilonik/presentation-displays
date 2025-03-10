@@ -1,3 +1,6 @@
+## 1.0.1
+* Remove depreceated method
+
 ## 1.0.0
 * Able to package android release build. Works fine in example app.
 
