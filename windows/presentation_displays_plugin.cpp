@@ -101,39 +101,75 @@ void PresentationDisplaysPlugin::HandleMethodCall(
       return;
     }
 
-    // Parse JSON manually (simple parsing for displayId and routerName)
-    // Format: {"displayId": <id>, "routerName": "<name>"}
-    std::string json = *arguments;
-    
-    // Extract displayId
-    size_t display_id_pos = json.find("\"displayId\"");
-    if (display_id_pos == std::string::npos) {
-      result->Error("INVALID_ARGUMENT", "Missing displayId");
+    try {
+      // Parse JSON manually (simple parsing for displayId and routerName)
+      // Format: {"displayId": <id>, "routerName": "<name>"}
+      std::string json = *arguments;
+      
+      // Extract displayId
+      size_t display_id_pos = json.find("\"displayId\"");
+      if (display_id_pos == std::string::npos) {
+        result->Error("INVALID_ARGUMENT", "Missing displayId");
+        return;
+      }
+      
+      size_t colon_pos = json.find(":", display_id_pos);
+      if (colon_pos == std::string::npos) {
+        result->Error("INVALID_ARGUMENT", "Invalid JSON format for displayId");
+        return;
+      }
+      
+      size_t comma_pos = json.find(",", colon_pos);
+      if (comma_pos == std::string::npos) {
+        result->Error("INVALID_ARGUMENT", "Invalid JSON format");
+        return;
+      }
+      
+      std::string display_id_str = json.substr(colon_pos + 1, comma_pos - colon_pos - 1);
+      // Remove whitespace
+      display_id_str.erase(0, display_id_str.find_first_not_of(" \t\n\r"));
+      display_id_str.erase(display_id_str.find_last_not_of(" \t\n\r") + 1);
+      int display_id = std::stoi(display_id_str);
+
+      // Extract routerName
+      size_t router_name_pos = json.find("\"routerName\"");
+      if (router_name_pos == std::string::npos) {
+        result->Error("INVALID_ARGUMENT", "Missing routerName");
+        return;
+      }
+      
+      size_t router_colon_pos = json.find(":", router_name_pos);
+      if (router_colon_pos == std::string::npos) {
+        result->Error("INVALID_ARGUMENT", "Invalid JSON format for routerName");
+        return;
+      }
+      
+      size_t first_quote = json.find("\"", router_colon_pos);
+      if (first_quote == std::string::npos) {
+        result->Error("INVALID_ARGUMENT", "Invalid JSON format for routerName");
+        return;
+      }
+      
+      size_t second_quote = json.find("\"", first_quote + 1);
+      if (second_quote == std::string::npos) {
+        result->Error("INVALID_ARGUMENT", "Invalid JSON format for routerName");
+        return;
+      }
+      
+      std::string router_name = json.substr(first_quote + 1, second_quote - first_quote - 1);
+
+      bool success = ShowPresentation(display_id, router_name);
+      result->Success(flutter::EncodableValue(success));
+    } catch (const std::invalid_argument& e) {
+      result->Error("INVALID_ARGUMENT", "Invalid display ID format");
+      return;
+    } catch (const std::out_of_range& e) {
+      result->Error("INVALID_ARGUMENT", "Display ID out of range");
+      return;
+    } catch (const std::exception& e) {
+      result->Error("PARSING_ERROR", std::string("Error parsing arguments: ") + e.what());
       return;
     }
-    
-    size_t colon_pos = json.find(":", display_id_pos);
-    size_t comma_pos = json.find(",", colon_pos);
-    std::string display_id_str = json.substr(colon_pos + 1, comma_pos - colon_pos - 1);
-    // Remove whitespace
-    display_id_str.erase(0, display_id_str.find_first_not_of(" \t\n\r"));
-    display_id_str.erase(display_id_str.find_last_not_of(" \t\n\r") + 1);
-    int display_id = std::stoi(display_id_str);
-
-    // Extract routerName
-    size_t router_name_pos = json.find("\"routerName\"");
-    if (router_name_pos == std::string::npos) {
-      result->Error("INVALID_ARGUMENT", "Missing routerName");
-      return;
-    }
-    
-    size_t router_colon_pos = json.find(":", router_name_pos);
-    size_t first_quote = json.find("\"", router_colon_pos);
-    size_t second_quote = json.find("\"", first_quote + 1);
-    std::string router_name = json.substr(first_quote + 1, second_quote - first_quote - 1);
-
-    bool success = ShowPresentation(display_id, router_name);
-    result->Success(flutter::EncodableValue(success));
   } else if (method_name == "hidePresentation") {
     const auto* arguments = std::get_if<std::string>(method_call.arguments());
     if (!arguments) {
@@ -141,23 +177,44 @@ void PresentationDisplaysPlugin::HandleMethodCall(
       return;
     }
 
-    // Parse JSON for displayId
-    std::string json = *arguments;
-    size_t display_id_pos = json.find("\"displayId\"");
-    if (display_id_pos == std::string::npos) {
-      result->Error("INVALID_ARGUMENT", "Missing displayId");
+    try {
+      // Parse JSON for displayId
+      std::string json = *arguments;
+      size_t display_id_pos = json.find("\"displayId\"");
+      if (display_id_pos == std::string::npos) {
+        result->Error("INVALID_ARGUMENT", "Missing displayId");
+        return;
+      }
+      
+      size_t colon_pos = json.find(":", display_id_pos);
+      if (colon_pos == std::string::npos) {
+        result->Error("INVALID_ARGUMENT", "Invalid JSON format for displayId");
+        return;
+      }
+      
+      size_t end_pos = json.find_first_of(",}", colon_pos);
+      if (end_pos == std::string::npos) {
+        result->Error("INVALID_ARGUMENT", "Invalid JSON format");
+        return;
+      }
+      
+      std::string display_id_str = json.substr(colon_pos + 1, end_pos - colon_pos - 1);
+      display_id_str.erase(0, display_id_str.find_first_not_of(" \t\n\r"));
+      display_id_str.erase(display_id_str.find_last_not_of(" \t\n\r") + 1);
+      int display_id = std::stoi(display_id_str);
+
+      bool success = HidePresentation(display_id);
+      result->Success(flutter::EncodableValue(success));
+    } catch (const std::invalid_argument& e) {
+      result->Error("INVALID_ARGUMENT", "Invalid display ID format");
+      return;
+    } catch (const std::out_of_range& e) {
+      result->Error("INVALID_ARGUMENT", "Display ID out of range");
+      return;
+    } catch (const std::exception& e) {
+      result->Error("PARSING_ERROR", std::string("Error parsing arguments: ") + e.what());
       return;
     }
-    
-    size_t colon_pos = json.find(":", display_id_pos);
-    size_t end_pos = json.find_first_of(",}", colon_pos);
-    std::string display_id_str = json.substr(colon_pos + 1, end_pos - colon_pos - 1);
-    display_id_str.erase(0, display_id_str.find_first_not_of(" \t\n\r"));
-    display_id_str.erase(display_id_str.find_last_not_of(" \t\n\r") + 1);
-    int display_id = std::stoi(display_id_str);
-
-    bool success = HidePresentation(display_id);
-    result->Success(flutter::EncodableValue(success));
   } else if (method_name == "transferDataToPresentation") {
     bool success = TransferDataToPresentation(*method_call.arguments());
     result->Success(flutter::EncodableValue(success));
@@ -221,10 +278,18 @@ bool PresentationDisplaysPlugin::ShowPresentation(int display_id, const std::str
     return false;
   }
 
+  // Initialize engine channel for data transfer
   // Note: Full Flutter engine integration on secondary windows requires
   // significant Flutter framework support. This implementation provides
   // the infrastructure but full functionality would require Flutter engine
   // multi-window support which is still evolving on desktop platforms.
+  
+  if (!engine_channel_) {
+    engine_channel_ = std::make_unique<flutter::MethodChannel<flutter::EncodableValue>>(
+        registrar_->messenger(), 
+        "presentation_displays_plugin_engine",
+        &flutter::StandardMethodCodec::GetInstance());
+  }
   
   // For now, we create a placeholder window on the secondary display
   // that can be used when Flutter fully supports multiple windows on Windows

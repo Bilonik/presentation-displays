@@ -61,6 +61,15 @@ void secondaryDisplayMain() {
 
 - WIP Send data back from 2nd to 1st display
 
+### Windows Platform Notes
+
+Windows support is available with the following considerations:
+
+- Display enumeration using Windows Display API (EnumDisplayMonitors)
+- Secondary window creation on specified displays
+- Full Flutter engine integration on secondary windows requires Flutter framework multi-window support which is still evolving on desktop platforms
+- The current implementation provides the infrastructure and will gain full functionality as Flutter's desktop multi-window support matures
+
 You can take a look at our example to learn more about how the plugin works
 
 #### Test on Sunmi-D2 device
