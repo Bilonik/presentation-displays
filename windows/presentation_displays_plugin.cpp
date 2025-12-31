@@ -26,6 +26,16 @@ BOOL CALLBACK MonitorEnumProc(HMONITOR hMonitor, HDC hdcMonitor, LPRECT lprcMoni
   return TRUE;
 }
 
+// Helper function to safely trim whitespace from a string
+std::string TrimWhitespace(const std::string& str) {
+  size_t start = str.find_first_not_of(" \t\n\r");
+  if (start == std::string::npos) {
+    return "";  // String contains only whitespace
+  }
+  size_t end = str.find_last_not_of(" \t\n\r");
+  return str.substr(start, end - start + 1);
+}
+
 }  // namespace
 
 // static
@@ -126,9 +136,11 @@ void PresentationDisplaysPlugin::HandleMethodCall(
       }
       
       std::string display_id_str = json.substr(colon_pos + 1, comma_pos - colon_pos - 1);
-      // Remove whitespace
-      display_id_str.erase(0, display_id_str.find_first_not_of(" \t\n\r"));
-      display_id_str.erase(display_id_str.find_last_not_of(" \t\n\r") + 1);
+      display_id_str = TrimWhitespace(display_id_str);
+      if (display_id_str.empty()) {
+        result->Error("INVALID_ARGUMENT", "Empty display ID");
+        return;
+      }
       int display_id = std::stoi(display_id_str);
 
       // Extract routerName
@@ -199,8 +211,11 @@ void PresentationDisplaysPlugin::HandleMethodCall(
       }
       
       std::string display_id_str = json.substr(colon_pos + 1, end_pos - colon_pos - 1);
-      display_id_str.erase(0, display_id_str.find_first_not_of(" \t\n\r"));
-      display_id_str.erase(display_id_str.find_last_not_of(" \t\n\r") + 1);
+      display_id_str = TrimWhitespace(display_id_str);
+      if (display_id_str.empty()) {
+        result->Error("INVALID_ARGUMENT", "Empty display ID");
+        return;
+      }
       int display_id = std::stoi(display_id_str);
 
       bool success = HidePresentation(display_id);
