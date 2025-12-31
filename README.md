@@ -1,6 +1,6 @@
 # presentation_displays
 
-#### Supported mobile platforms iOS and Android
+#### Supported platforms: iOS, Android, and Windows
 
 Flutter plugin supports to run on two screens. It's basically a tablet connected to another screen via an HDMI or Wireless
 

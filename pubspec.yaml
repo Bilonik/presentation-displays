@@ -26,3 +26,5 @@ flutter:
         pluginClass: PresentationDisplaysPlugin
       ios:
         pluginClass: PresentationDisplaysPlugin
+      windows:
+        pluginClass: PresentationDisplaysPlugin
