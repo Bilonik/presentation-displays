@@ -1,3 +1,8 @@
+## 1.0.2
+* Avoid duplicate iOS plugin registration when the UIScene lifecycle has already registered the secondary Flutter engine.
+* Avoid crashing when the legacy `controllerAdded` callback is not configured.
+* Create external-display windows with `UIWindowScene` when the host app uses the UIScene lifecycle.
+
 ## 1.0.1
 * Remove depreceated method
 
