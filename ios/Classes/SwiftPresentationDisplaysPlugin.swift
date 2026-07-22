@@ -138,7 +138,14 @@ public class SwiftPresentationDisplaysPlugin: NSObject, FlutterPlugin {
                 window!.isHidden=false
                 if (window!.rootViewController == nil || !(window!.rootViewController is FlutterViewController)){
                     let extVC = FlutterViewController(project: nil, initialRoute: routerName, nibName: nil, bundle: nil)
-                    SwiftPresentationDisplaysPlugin.controllerAdded!(extVC)
+
+                    // Flutter's UIScene lifecycle registers plugins on every
+                    // implicit engine before the view controller initializer
+                    // returns. Running the legacy registrant callback again
+                    // raises a "Duplicate plugin key" assertion.
+                    if !extVC.hasPlugin("PresentationDisplaysPlugin") {
+                        SwiftPresentationDisplaysPlugin.controllerAdded?(extVC)
+                    }
                     window?.rootViewController = extVC
 
                     self.flutterEngineChannel = FlutterMethodChannel(name: "presentation_displays_plugin_engine", binaryMessenger: extVC.binaryMessenger)

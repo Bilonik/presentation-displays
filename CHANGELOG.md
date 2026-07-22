@@ -1,3 +1,7 @@
+## 1.0.2
+* Avoid duplicate iOS plugin registration when the UIScene lifecycle has already registered the secondary Flutter engine.
+* Avoid crashing when the legacy `controllerAdded` callback is not configured.
+
 ## 1.0.1
 * Remove depreceated method
 
