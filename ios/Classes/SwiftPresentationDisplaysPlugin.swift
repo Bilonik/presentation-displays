@@ -3,6 +3,7 @@ import UIKit
 
 public class SwiftPresentationDisplaysPlugin: NSObject, FlutterPlugin {
     var additionalWindows = [UIScreen:UIWindow]()
+    var pendingPresentations = [UIScreen:String]()
     var screens = [UIScreen]()
     var flutterEngineChannel:FlutterMethodChannel?=nil
     public static var controllerAdded: ((FlutterViewController)->Void)?
@@ -11,48 +12,110 @@ public class SwiftPresentationDisplaysPlugin: NSObject, FlutterPlugin {
         super.init()
 
         screens.append(UIScreen.main)
+        registerAlreadyConnectedDisplays()
+
         NotificationCenter.default.addObserver(forName: UIScreen.didConnectNotification,
-                                               object: nil, queue: nil) {
+                                               object: nil, queue: .main) {
             notification in
 
-            // Get the new screen information.
             guard let newScreen = notification.object as? UIScreen else {
-                    return
-                  }
+                return
+            }
 
-            let screenDimensions = newScreen.bounds
-            // Configure a window for the screen.
-            let newWindow = UIWindow(frame: screenDimensions)
-            newWindow.screen = newScreen
-
-            // You must show the window explicitly.
-            newWindow.isHidden = true
-
-            // Save a reference to the window in a local array.
-            self.screens.append(newScreen)
-            self.additionalWindows[newScreen] = newWindow
-
+            self.addScreen(newScreen)
         }
 
         NotificationCenter.default.addObserver(forName:
                                                 UIScreen.didDisconnectNotification,
                                                object: nil,
-                                               queue: nil) { notification in
+                                               queue: .main) { notification in
             guard let screen = notification.object as? UIScreen else {
-                    return
-                  }
+                return
+            }
 
-           // Remove the window associated with the screen.
-                 for s in self.screens {
-                   if s == screen {
-                     if let index = self.screens.firstIndex(of: s) {
-                       self.screens.remove(at: index)
-                       // Remove the window and its contents.
-                       self.additionalWindows.removeValue(forKey: s)
-                     }
-                   }
-                 }
+            self.removeScreen(screen)
         }
+
+        if #available(iOS 13.0, *) {
+            NotificationCenter.default.addObserver(forName: UIScene.willConnectNotification,
+                                                   object: nil,
+                                                   queue: .main) { notification in
+                guard let windowScene = notification.object as? UIWindowScene,
+                      self.isExternalDisplayScene(windowScene) else {
+                    return
+                }
+
+                self.addScreen(windowScene.screen)
+                if let routerName = self.pendingPresentations.removeValue(forKey: windowScene.screen) {
+                    self.showPresentation(on: windowScene, routerName: routerName)
+                }
+            }
+
+            NotificationCenter.default.addObserver(forName: UIScene.didDisconnectNotification,
+                                                   object: nil,
+                                                   queue: .main) { notification in
+                guard let windowScene = notification.object as? UIWindowScene,
+                      self.isExternalDisplayScene(windowScene) else {
+                    return
+                }
+
+                self.removeScreen(windowScene.screen)
+            }
+        }
+    }
+
+    private var usesSceneLifecycle: Bool {
+        if #available(iOS 13.0, *) {
+            return Bundle.main.object(forInfoDictionaryKey: "UIApplicationSceneManifest") != nil
+        }
+        return false
+    }
+
+    private func addScreen(_ screen: UIScreen) {
+        if !screens.contains(screen) {
+            screens.append(screen)
+        }
+    }
+
+    private func removeScreen(_ screen: UIScreen) {
+        pendingPresentations.removeValue(forKey: screen)
+        if let window = additionalWindows.removeValue(forKey: screen) {
+            window.isHidden = true
+            if #available(iOS 13.0, *), usesSceneLifecycle {
+                window.windowScene = nil
+            }
+        }
+        screens.removeAll { $0 == screen }
+    }
+
+    private func registerAlreadyConnectedDisplays() {
+        if #available(iOS 13.0, *), usesSceneLifecycle {
+            for case let windowScene as UIWindowScene in UIApplication.shared.connectedScenes
+                where isExternalDisplayScene(windowScene) {
+                addScreen(windowScene.screen)
+            }
+        } else {
+            for screen in UIScreen.screens where screen != UIScreen.main {
+                addScreen(screen)
+            }
+        }
+    }
+
+    @available(iOS 13.0, *)
+    private func isExternalDisplayScene(_ windowScene: UIWindowScene) -> Bool {
+        if #available(iOS 16.0, *) {
+            if windowScene.session.role == .windowExternalDisplayNonInteractive {
+                return true
+            }
+        }
+        return windowScene.session.role.rawValue == "UIWindowSceneSessionRoleExternalDisplay"
+    }
+
+    @available(iOS 13.0, *)
+    private func connectedWindowScene(for screen: UIScreen) -> UIWindowScene? {
+        return UIApplication.shared.connectedScenes
+            .compactMap { $0 as? UIWindowScene }
+            .first { $0.screen == screen && isExternalDisplayScene($0) }
     }
     
     public static func register(with registrar: FlutterPluginRegistrar) {
@@ -129,39 +192,80 @@ public class SwiftPresentationDisplaysPlugin: NSObject, FlutterPlugin {
 
     private func showPresentation(index:Int, routerName:String )
     {
-        if index>0 && index < self.screens.count && self.additionalWindows.keys.contains(self.screens[index])
-        {
-            let screen=self.screens[index]
-            let window=self.additionalWindows[screen]
-
-            if (window != nil){
-                window!.isHidden=false
-                if (window!.rootViewController == nil || !(window!.rootViewController is FlutterViewController)){
-                    let extVC = FlutterViewController(project: nil, initialRoute: routerName, nibName: nil, bundle: nil)
-
-                    // Flutter's UIScene lifecycle registers plugins on every
-                    // implicit engine before the view controller initializer
-                    // returns. Running the legacy registrant callback again
-                    // raises a "Duplicate plugin key" assertion.
-                    if !extVC.hasPlugin("PresentationDisplaysPlugin") {
-                        SwiftPresentationDisplaysPlugin.controllerAdded?(extVC)
-                    }
-                    window?.rootViewController = extVC
-
-                    self.flutterEngineChannel = FlutterMethodChannel(name: "presentation_displays_plugin_engine", binaryMessenger: extVC.binaryMessenger)
-                }
-            }
+        guard index > 0 && index < screens.count else {
+            return
         }
+
+        let screen = screens[index]
+        if #available(iOS 13.0, *), usesSceneLifecycle {
+            guard let windowScene = connectedWindowScene(for: screen) else {
+                pendingPresentations[screen] = routerName
+                return
+            }
+
+            showPresentation(on: windowScene, routerName: routerName)
+            return
+        }
+
+        let window = additionalWindows[screen] ?? createLegacyWindow(for: screen)
+        configure(window: window, routerName: routerName)
+    }
+
+    private func createLegacyWindow(for screen: UIScreen) -> UIWindow {
+        let window = UIWindow(frame: screen.bounds)
+        window.screen = screen
+        additionalWindows[screen] = window
+        return window
+    }
+
+    @available(iOS 13.0, *)
+    private func showPresentation(on windowScene: UIWindowScene, routerName: String) {
+        let screen = windowScene.screen
+        let window: UIWindow
+        if let existingWindow = additionalWindows[screen], existingWindow.windowScene === windowScene {
+            window = existingWindow
+        } else {
+            additionalWindows[screen]?.windowScene = nil
+            window = UIWindow(windowScene: windowScene)
+            additionalWindows[screen] = window
+        }
+
+        configure(window: window, routerName: routerName)
+    }
+
+    private func configure(window: UIWindow, routerName: String) {
+        if window.rootViewController == nil || !(window.rootViewController is FlutterViewController) {
+            let extVC = FlutterViewController(project: nil, initialRoute: routerName, nibName: nil, bundle: nil)
+
+            // Flutter's UIScene lifecycle registers plugins on every
+            // implicit engine before the view controller initializer
+            // returns. Running the legacy registrant callback again
+            // raises a "Duplicate plugin key" assertion.
+            if !extVC.hasPlugin("PresentationDisplaysPlugin") {
+                SwiftPresentationDisplaysPlugin.controllerAdded?(extVC)
+            }
+            window.rootViewController = extVC
+
+            flutterEngineChannel = FlutterMethodChannel(name: "presentation_displays_plugin_engine", binaryMessenger: extVC.binaryMessenger)
+        }
+
+        window.makeKeyAndVisible()
     }
 
     private func hidePresentation(index:Int)
     {
-        if index>0 && index < self.screens.count && self.additionalWindows.keys.contains(self.screens[index])
-        {
-            let screen=self.screens[index]
-            let window=self.additionalWindows[screen]
+        guard index > 0 && index < screens.count else {
+            return
+        }
 
-            window?.isHidden=true
+        let screen = screens[index]
+        pendingPresentations.removeValue(forKey: screen)
+        if let window = additionalWindows[screen] {
+            window.isHidden = true
+            if #available(iOS 13.0, *), usesSceneLifecycle {
+                window.windowScene = nil
+                additionalWindows.removeValue(forKey: screen)
+            }
         }
     }
 

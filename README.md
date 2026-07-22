@@ -53,6 +53,33 @@ void secondaryDisplayMain() {
 
 - In case of iOS, please refer to example app app delegate. There are few lines of code which needs to be added to your app's app delegate as well for this to work fine in iOS.
 
+#### iOS apps using UIScene
+
+Apps using the UIScene lifecycle must declare a noninteractive external-display scene. Set `UIApplicationSupportsMultipleScenes` to `true` and add these entries inside `UIApplicationSceneManifest > UISceneConfigurations`:
+
+```xml
+<key>UIWindowSceneSessionRoleExternalDisplayNonInteractive</key>
+<array>
+    <dict>
+        <key>UISceneClassName</key>
+        <string>UIWindowScene</string>
+        <key>UISceneConfigurationName</key>
+        <string>presentation_displays_external</string>
+    </dict>
+</array>
+<key>UIWindowSceneSessionRoleExternalDisplay</key>
+<array>
+    <dict>
+        <key>UISceneClassName</key>
+        <string>UIWindowScene</string>
+        <key>UISceneConfigurationName</key>
+        <string>presentation_displays_external_legacy</string>
+    </dict>
+</array>
+```
+
+The noninteractive role is used on iOS 16 and newer. The legacy role keeps external displays working on iOS 13 through iOS 15.
+
 - Updated optional issues and null checks
 
 - Added option to hide second display from the first
@@ -66,4 +93,3 @@ You can take a look at our example to learn more about how the plugin works
 #### Test on Sunmi-D2 device
 
 ![The example app running in android](https://github.com/VNAPNIC/presentation-displays/blob/master/Sequence_small.gif?raw=true)
-
