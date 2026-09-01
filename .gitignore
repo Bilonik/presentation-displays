@@ -5,5 +5,9 @@
 .pub/
 
 build/
+example/ios/Flutter/ephemeral/
 
 .idea/
+
+# CodeQL
+_codeql_detected_source_root

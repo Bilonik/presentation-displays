@@ -1,3 +1,10 @@
+## 1.1.0
+* Add Windows display enumeration and hot-plug notifications.
+* Render the `secondaryDisplayMain` Flutter entrypoint in a full-screen window on the selected Windows monitor.
+* Support data transfer in both directions on Windows and typed platform-channel arguments on every platform.
+* Return accurate failure results when a presentation cannot be shown, hidden, or reached.
+* Require Flutter 3.44/Dart 3.12 and modernize the Android Gradle toolchain.
+
 ## 1.0.2
 * Avoid duplicate iOS plugin registration when the UIScene lifecycle has already registered the secondary Flutter engine.
 * Avoid crashing when the legacy `controllerAdded` callback is not configured.

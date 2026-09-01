@@ -1,6 +1,6 @@
 # presentation_displays
 
-#### Supported mobile platforms iOS and Android
+#### Supported platforms: iOS, Android, and Windows
 
 Flutter plugin supports to run on two screens. It's basically a tablet connected to another screen via an HDMI or Wireless
 
@@ -38,7 +38,7 @@ Widget build (BuildContext context) {
     );
 }
 ```
-- wesetup new entry point for secondary display so we can decided what we need to call for initialization. Works only for android for now
+- Set up a second entry point for the secondary display on Android and Windows:
 ```dart
 @pragma('vm:entry-point')
 void secondaryDisplayMain() {
@@ -87,6 +87,18 @@ The noninteractive role is used on iOS 16 and newer. The legacy role keeps exter
 - WIP support second main in iOS for extended display
 
 - WIP Send data back from 2nd to 1st display
+
+### Windows Platform Notes
+
+Windows support:
+
+- Enumerates active monitors with the Windows display APIs. The primary monitor is display `0`; presentation windows must target a secondary monitor.
+- Starts `secondaryDisplayMain` in a separate Flutter engine and places its Flutter view in a borderless, full-screen window on the selected monitor.
+- Applies `routerName` as the secondary engine's initial route.
+- Sends data between `MainDisplay` and `SecondaryDisplay`, and reports monitor connection or disconnection through `connectedDisplaysChangedStream`.
+- Closes the presentation engine and window when the display disconnects.
+
+The example includes a Windows runner and the required `secondaryDisplayMain` entry point. Native plugins used by the secondary entry point are not automatically registered with its separate Windows engine, so keep that entry point independent of native plugins unless the host runner explicitly registers them.
 
 You can take a look at our example to learn more about how the plugin works
 

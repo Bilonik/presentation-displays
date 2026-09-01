@@ -140,47 +140,29 @@ public class SwiftPresentationDisplaysPlugin: NSObject, FlutterPlugin {
             result(jsonDisplaysList)
         }
         else if call.method=="showPresentation"{
-            let args = call.arguments as? String
-            let data = args?.data(using: .utf8)!
-            do {
-                if let json = try JSONSerialization.jsonObject(with: data ?? Data(), options : .allowFragments) as? Dictionary<String,Any>
-                {
-                    print(json)
-                    showPresentation(index:json["displayId"] as? Int ?? 1, routerName: json["routerName"] as? String ?? "presentation")
-                    result(true)
-                }
-                else {
-                    print("bad json")
-                    result(false)
-                }
-            }
-            catch let error as NSError {
-                print(error)
+            guard let arguments = dictionaryArguments(call.arguments),
+                  let displayId = arguments["displayId"] as? Int,
+                  let routerName = arguments["routerName"] as? String,
+                  !routerName.isEmpty else {
                 result(false)
+                return
             }
+            result(showPresentation(index: displayId, routerName: routerName))
         }
         else if call.method=="hidePresentation"{
-            let args = call.arguments as? String
-            let data = args?.data(using: .utf8)!
-            do {
-                if let json = try JSONSerialization.jsonObject(with: data ?? Data(), options : .allowFragments) as? Dictionary<String,Any>
-                {
-                    print(json)
-                    hidePresentation(index:json["displayId"] as? Int ?? 1)
-                    result(true)
-                }
-                else {
-                    print("bad json")
-                    result(false)
-                }
-            }
-            catch let error as NSError {
-                print(error)
+            guard let arguments = dictionaryArguments(call.arguments),
+                  let displayId = arguments["displayId"] as? Int else {
                 result(false)
+                return
             }
+            result(hidePresentation(index: displayId))
         }
         else if call.method=="transferDataToPresentation"{
-            self.flutterEngineChannel?.invokeMethod("DataTransfer", arguments: call.arguments)
+            guard let channel = self.flutterEngineChannel else {
+                result(false)
+                return
+            }
+            channel.invokeMethod("DataTransfer", arguments: call.arguments)
             result(true)
         }
         else
@@ -190,25 +172,37 @@ public class SwiftPresentationDisplaysPlugin: NSObject, FlutterPlugin {
 
     }
 
-    private func showPresentation(index:Int, routerName:String )
+    private func dictionaryArguments(_ arguments: Any?) -> [String: Any]? {
+        if let dictionary = arguments as? [String: Any] {
+            return dictionary
+        }
+        guard let string = arguments as? String,
+              let data = string.data(using: .utf8) else {
+            return nil
+        }
+        return (try? JSONSerialization.jsonObject(with: data)) as? [String: Any]
+    }
+
+    private func showPresentation(index:Int, routerName:String) -> Bool
     {
         guard index > 0 && index < screens.count else {
-            return
+            return false
         }
 
         let screen = screens[index]
         if #available(iOS 13.0, *), usesSceneLifecycle {
             guard let windowScene = connectedWindowScene(for: screen) else {
                 pendingPresentations[screen] = routerName
-                return
+                return true
             }
 
             showPresentation(on: windowScene, routerName: routerName)
-            return
+            return true
         }
 
         let window = additionalWindows[screen] ?? createLegacyWindow(for: screen)
         configure(window: window, routerName: routerName)
+        return true
     }
 
     private func createLegacyWindow(for screen: UIScreen) -> UIWindow {
@@ -252,21 +246,23 @@ public class SwiftPresentationDisplaysPlugin: NSObject, FlutterPlugin {
         window.makeKeyAndVisible()
     }
 
-    private func hidePresentation(index:Int)
+    private func hidePresentation(index:Int) -> Bool
     {
         guard index > 0 && index < screens.count else {
-            return
+            return false
         }
 
         let screen = screens[index]
-        pendingPresentations.removeValue(forKey: screen)
+        let wasPending = pendingPresentations.removeValue(forKey: screen) != nil
         if let window = additionalWindows[screen] {
             window.isHidden = true
             if #available(iOS 13.0, *), usesSceneLifecycle {
                 window.windowScene = nil
                 additionalWindows.removeValue(forKey: screen)
             }
+            return true
         }
+        return wasPending
     }
 
 }
