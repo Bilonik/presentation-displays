@@ -102,8 +102,9 @@ std::optional<int> EncodableInteger(const flutter::EncodableValue& value) {
     return *integer;
   }
   if (const auto* integer = std::get_if<int64_t>(&value)) {
-    if (*integer >= std::numeric_limits<int>::min() &&
-        *integer <= std::numeric_limits<int>::max()) {
+    // Parenthesize these calls so the Windows min/max macros cannot expand.
+    if (*integer >= (std::numeric_limits<int>::min)() &&
+        *integer <= (std::numeric_limits<int>::max)()) {
       return static_cast<int>(*integer);
     }
   }
