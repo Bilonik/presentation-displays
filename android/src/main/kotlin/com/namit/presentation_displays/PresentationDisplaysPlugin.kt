@@ -7,7 +7,6 @@ import android.os.Handler
 import android.os.Looper
 import android.util.Log
 import android.view.Display
-import androidx.annotation.NonNull
 import com.google.gson.Gson
 import io.flutter.FlutterInjector
 import io.flutter.embedding.engine.FlutterEngine
@@ -19,7 +18,6 @@ import io.flutter.embedding.engine.plugins.activity.ActivityPluginBinding
 import io.flutter.plugin.common.EventChannel
 import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
-import io.flutter.plugin.common.PluginRegistry
 import org.json.JSONObject
 
 /** PresentationDisplaysPlugin */
@@ -33,7 +31,7 @@ class PresentationDisplaysPlugin : FlutterPlugin, ActivityAware, MethodChannel.M
   private var flutterBinding: FlutterPlugin.FlutterPluginBinding? = null
 
   override fun onAttachedToEngine(
-      @NonNull flutterPluginBinding: FlutterPlugin.FlutterPluginBinding
+      flutterPluginBinding: FlutterPlugin.FlutterPluginBinding
   ) {
     channel = MethodChannel(flutterPluginBinding.binaryMessenger, viewTypeId)
     channel.setMethodCallHandler(this)
@@ -79,7 +77,7 @@ class PresentationDisplaysPlugin : FlutterPlugin, ActivityAware, MethodChannel.M
     when (call.method) {
       "showPresentation" -> {
         try {
-          val obj = JSONObject(call.arguments as String)
+          val obj = jsonArguments(call.arguments)
           Log.i(
               TAG,
               "Channel: method: ${call.method} | displayId: ${obj.getInt("displayId")} | routerName: ${
@@ -90,7 +88,7 @@ class PresentationDisplaysPlugin : FlutterPlugin, ActivityAware, MethodChannel.M
           val tag: String = obj.getString("routerName")
           val display = displayManager?.getDisplay(displayId)
           if (display != null) {
-              var dataToMainCallback: (Any?) -> Unit = {
+              val dataToMainCallback: (Any?) -> Unit = {
                       argument : Any? ->
                   MethodChannel(
                       flutterBinding!!.flutterEngine.dartExecutor.binaryMessenger,
@@ -120,7 +118,7 @@ class PresentationDisplaysPlugin : FlutterPlugin, ActivityAware, MethodChannel.M
       }
       "hidePresentation" -> {
         try {
-          val obj = JSONObject(call.arguments as String)
+          val obj = jsonArguments(call.arguments)
           Log.i(TAG, "Channel: method: ${call.method} | displayId: ${obj.getInt("displayId")}")
 
           presentation?.dismiss()
@@ -144,15 +142,28 @@ class PresentationDisplaysPlugin : FlutterPlugin, ActivityAware, MethodChannel.M
         result.success(Gson().toJson(listJson))
       }
       "transferDataToPresentation" -> {
-        try {
-          flutterEngineChannel?.invokeMethod("DataTransfer", call.arguments)
-          result.success(true)
-        } catch (e: Exception) {
+        val engineChannel = flutterEngineChannel
+        if (engineChannel == null) {
           result.success(false)
+        } else {
+          try {
+            engineChannel.invokeMethod("DataTransfer", call.arguments)
+            result.success(true)
+          } catch (e: Exception) {
+            result.success(false)
+          }
         }
       }
+      else -> result.notImplemented()
     }
   }
+
+  private fun jsonArguments(arguments: Any?): JSONObject =
+      when (arguments) {
+        is String -> JSONObject(arguments)
+        is Map<*, *> -> JSONObject(arguments)
+        else -> throw IllegalArgumentException("Arguments must be a map")
+      }
 
   private fun createFlutterEngine(tag: String): FlutterEngine? {
     if (context == null) return null
