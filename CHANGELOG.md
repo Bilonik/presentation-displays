@@ -1,3 +1,7 @@
+## 1.1.1
+* Start the Windows secondary Flutter engine before registering or using its messenger.
+* Prevent the main Windows POS window from freezing or crashing when a presentation opens.
+
 ## 1.1.0
 * Add Windows display enumeration and hot-plug notifications.
 * Render the `secondaryDisplayMain` Flutter entrypoint in a full-screen window on the selected Windows monitor.

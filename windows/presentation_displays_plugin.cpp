@@ -516,7 +516,7 @@ bool PresentationDisplaysPlugin::EnsureSecondaryWindowClassRegistered()
 
 bool PresentationDisplaysPlugin::ShowPresentation(
     int display_id,
-    const std::string& router_name) {
+    const std::string&) {
   const auto displays = EnumerateDisplays();
   const auto display =
       std::find_if(displays.begin(), displays.end(),
@@ -563,29 +563,19 @@ bool PresentationDisplaysPlugin::ShowPresentation(
     return false;
   }
 
-  window->messenger = FlutterDesktopEngineGetMessenger(engine);
-  const std::string navigation_message =
-      "{\"method\":\"setInitialRoute\",\"args\":\"" +
-      JsonEscape(router_name) + "\"}";
-  if (!FlutterDesktopMessengerSend(
-          window->messenger, "flutter/navigation",
-          reinterpret_cast<const uint8_t*>(navigation_message.data()),
-          navigation_message.size())) {
-    FlutterDesktopEngineDestroy(engine);
-    DestroyWindow(window->host_window);
-    return false;
-  }
-
-  FlutterDesktopMessengerSetCallback(window->messenger,
-                                     kMainDisplayChannelName,
-                                     SecondaryMainChannelCallback,
-                                     window.get());
   window->view_controller =
       FlutterDesktopViewControllerCreate(width, height, engine);
   if (!window->view_controller) {
     DestroyWindow(window->host_window);
     return false;
   }
+
+  window->messenger = FlutterDesktopEngineGetMessenger(
+      FlutterDesktopViewControllerGetEngine(window->view_controller));
+  FlutterDesktopMessengerSetCallback(window->messenger,
+                                     kMainDisplayChannelName,
+                                     SecondaryMainChannelCallback,
+                                     window.get());
 
   const FlutterDesktopViewRef view =
       FlutterDesktopViewControllerGetView(window->view_controller);
